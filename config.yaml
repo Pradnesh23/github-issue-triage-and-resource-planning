@@ -1,0 +1,109 @@
+# GitHub Issue Complexity Predictor Configuration
+
+github:
+  # GitHub personal access token (required for API access)
+  # Generate one at https://github.com/settings/tokens
+  token: "YOUR_GITHUB_TOKEN_HERE"
+  
+  # Webhook secret (optional but recommended for security)
+  webhook_secret: "YOUR_WEBHOOK_SECRET_HERE"
+  
+  # List of repositories to monitor
+  repositories:
+    - "angular/angular"
+    - "apple/swift"
+    - "aws/aws-sdk-go"
+    - "elastic/elasticsearch"
+    - "envoyproxy/envoy"
+    - "expressjs/express"
+    - "facebook/react"
+    - "flutter/flutter"
+    - "golang/go"
+    - "grpc/grpc"
+    - "hashicorp/terraform"
+    - "hashicorp/vault"
+    - "helm/helm"
+    - "istio/istio"
+    - "kubernetes/helm"
+    - "kubernetes/kubernetes"
+    - "microsoft/TypeScript"
+    - "microsoft/vscode"
+    - "netty/netty"
+    - "nodejs/node"
+    - "numpy/numpy"
+    - "pandas-dev/pandas"
+    - "prometheus/prometheus"
+    - "pytorch/pytorch"
+    - "rails/rails"
+    - "redis/redis"
+    - "rust-lang/rust"
+    - "scikit-learn/scikit-learn"
+    - "spring-projects/spring-boot"
+    - "square/okhttp"
+    - "square/retrofit"
+    - "tensorflow/tensorflow"
+  
+  # Maximum number of issues to collect per repository
+  max_issues_per_repo: 1000
+  
+  # Whether to include closed issues
+  include_closed: true
+  
+  # Minimum number of comments an issue should have to be included
+  min_comments: 0
+
+api:
+  # API server configuration
+  host: "127.0.0.1"
+  port: 8000
+  reload: true
+
+data_paths:
+  # Path to store raw collected data
+  raw_data_path: "data/raw/github_issues.csv"
+  
+  # Path to store processed data
+  processed_data_path: "data/processed/github_issues_processed.csv"
+  
+  # Path to store feature data
+  feature_data_path: "data/features/github_issues_features.csv"
+  
+  # Model save path
+  model_path: "models/issue_complexity_model.pkl"
+
+model:
+  # Model parameters
+  random_state: 42
+  test_size: 0.2
+  min_issues_for_retrain: 100
+  
+  # Feature engineering parameters
+  max_features: 1000
+  ngram_range: [1, 2]
+  
+  # BERT model parameters
+  model_name: "distilbert-base-uncased"
+  max_length: 512
+  batch_size: 16
+  learning_rate: 2e-5
+  num_epochs: 10
+
+notifications:
+  # Notification settings (optional)
+  slack_webhook_url: ""
+  email_smtp_server: ""
+  email_port: 587
+  email_username: ""
+  email_password: ""
+  
+  # Team assignments based on complexity
+  team_assignments:
+    simple: "junior-developers"
+    moderate: "mid-level-developers"
+    complex: "senior-developers"
+
+logging:
+  # Logging configuration
+  level: "INFO"
+  file: "app.log"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
