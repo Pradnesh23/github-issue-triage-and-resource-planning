@@ -1,0 +1,52 @@
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+parts/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env
+
+# IDEs and editors
+.idea/
+.vscode/
+*.sublime-workspace
+
+# Jupyter
+.ipynb_checkpoints
+
+# Data and models
+data/
+data/raw/
+data/processed/
+best_model_bert_3class/
+*.joblib
+*.safetensors
+
+# Logs and local environment files
+*.log
+.env*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.mypy_cache/
+.cache/
+.coverage
+htmlcov/
