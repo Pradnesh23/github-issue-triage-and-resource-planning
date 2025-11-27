@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 from typing import Dict, List, Any
+from github import Github
 
 # Load configuration
 with open("config.yaml", "r") as f:
@@ -182,12 +183,59 @@ def main():
         st.warning("⚠️ API is not running. Please start the API server for full functionality.")
     
     # Create tabs for different functionalities
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab_conn, tab1, tab2, tab3, tab4 = st.tabs([
+        "Connect GitHub",
         "Single Issue Prediction", 
         "Batch Prediction", 
         "Webhook Setup", 
         "Dashboard"
     ])
+
+    with tab_conn:
+        st.header("Connect GitHub Repository")
+        token = st.text_input("GitHub Personal Access Token", type="password")
+        if token:
+            st.session_state["gh_token"] = token
+        has_token = bool(st.session_state.get("gh_token"))
+        if has_token:
+            try:
+                gh = Github(st.session_state["gh_token"])
+                user = gh.get_user()
+                repos = list(user.get_repos())
+                repo_names = [r.full_name for r in repos]
+                selected_repo = st.selectbox("Select Repository", options=repo_names)
+                st.session_state["selected_repo"] = selected_repo
+                if st.button("Fetch Open Issues and Run Triage"):
+                    with st.spinner("Fetching issues and predicting complexity..."):
+                        repo = gh.get_repo(selected_repo)
+                        issues = list(repo.get_issues(state="open"))
+                        issues_data = []
+                        for it in issues:
+                            labels = [lb.name for lb in it.get_labels()]
+                            issues_data.append({
+                                "title": it.title or "",
+                                "body": it.body or "",
+                                "repo": selected_repo,
+                                "number": it.number,
+                                "labels": labels
+                            })
+                        if api_status and issues_data:
+                            batch_result = predict_batch_complexity(issues_data)
+                            if batch_result and batch_result.get("predictions"):
+                                results_df = pd.DataFrame(batch_result["predictions"])
+                                st.dataframe(results_df, use_container_width=True)
+                                apply = st.checkbox("Apply complexity labels to GitHub")
+                                if apply:
+                                    for _, row in results_df.iterrows():
+                                        try:
+                                            gh_issue = repo.get_issue(int(row.get("issue_number") or 0))
+                                            gh_issue.add_to_labels(f"complexity:{row.get('complexity')}")
+                                        except Exception:
+                                            pass
+                        else:
+                            st.info("No open issues found or API is unavailable.")
+            except Exception as e:
+                st.error(str(e))
     
     with tab1:
         st.header("Predict Complexity of a Single Issue")
@@ -203,7 +251,6 @@ def main():
                 
             with col2:
                 labels = st.text_input("Labels", placeholder="bug, feature, enhancement (comma-separated)")
-                comments = st.number_input("Number of Comments", min_value=0, value=0)
             
             body = st.text_area("Issue Description", placeholder="Enter the full issue description", height=200)
             
@@ -217,7 +264,6 @@ def main():
                 "repo": repo,
                 "author": author,
                 "labels": [label.strip() for label in labels.split(",") if label.strip()],
-                "comments": comments
             }
             
             # Make prediction
@@ -310,18 +356,16 @@ def main():
     
     with tab3:
         st.header("Webhook Setup for Real-time Integration")
+        st.markdown("Configure GitHub webhooks to automatically analyze new issues as they're created.")
+        public_url = st.text_input("Public Server URL", placeholder="https://your-domain")
+        payload_url = f"{public_url.rstrip('/')}/webhook/github" if public_url else f"http://{config['api']['host']}:{config['api']['port']}/webhook/github"
+        st.code(f"Payload URL: {payload_url}")
         st.markdown("""
-        Configure GitHub webhooks to automatically analyze new issues as they're created.
-        
-        ### Setup Instructions:
         1. Go to your GitHub repository settings
-        2. Navigate to "Webhooks" section
-        3. Click "Add webhook"
-        4. Set the Payload URL to: `YOUR_SERVER_URL/webhook/github`
-        5. Set Content type to: `application/json`
-        6. Select "Let me select individual events" and choose "Issues"
-        7. Ensure "Active" is checked
-        8. Click "Add webhook"
+        2. Navigate to Webhooks → Add webhook
+        3. Content type: application/json
+        4. Events: Issues and Issue comments
+        5. Active: checked
         """)
         
         st.info("Note: You'll need to deploy this application to a public server for GitHub to reach your webhook endpoint.")
@@ -374,6 +418,16 @@ def main():
             })
             dashboard_df = sample_data
         
+        # Repository filter
+        st.subheader("Repository Filter")
+        selected_repo = st.session_state.get("selected_repo")
+        if dashboard_df is not None and "repo" in dashboard_df.columns:
+            repos_list = sorted(list({r for r in dashboard_df["repo"].dropna().unique()}))
+            default_index = repos_list.index(selected_repo) if selected_repo in repos_list else 0 if repos_list else None
+            if repos_list:
+                repo_choice = st.selectbox("Filter by repository", options=repos_list, index=default_index if default_index is not None else 0)
+                dashboard_df = dashboard_df[dashboard_df["repo"] == repo_choice]
+
         # Complexity distribution chart
         st.subheader("Complexity Distribution Across Repositories")
         if {"repo", "complexity"}.issubset(set(dashboard_df.columns)):

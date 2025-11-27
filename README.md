@@ -26,7 +26,7 @@ An automated system for GitHub issue triage and resource planning that classifie
 
 1. Clone the repository:
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Pradnesh23/github-issue-triage-and-resource-planning.git
    cd github-issue-predictor
    ```
 

@@ -3,10 +3,10 @@
 github:
   # GitHub personal access token (required for API access)
   # Generate one at https://github.com/settings/tokens
-  token: "YOUR_GITHUB_TOKEN_HERE"
+  token: "${GITHUB_TOKEN}"
   
   # Webhook secret (optional but recommended for security)
-  webhook_secret: "YOUR_WEBHOOK_SECRET_HERE"
+  webhook_secret: "${WEBHOOK_SECRET}"
   
   # List of repositories to monitor
   repositories:

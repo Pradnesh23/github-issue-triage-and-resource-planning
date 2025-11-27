@@ -125,9 +125,8 @@ class GitHubIssuePredictor:
 
         # Base score from length and comments
         score = 0.0
-        score += min(1.0, char_len / 4000.0) * 0.4
-        score += min(1.0, word_len / 800.0) * 0.3
-        score += min(1.0, comments / 20.0) * 0.3
+        score += min(1.0, char_len / 4000.0) * 0.6
+        score += min(1.0, word_len / 800.0) * 0.4
 
         # Label modifiers
         if has_security:
