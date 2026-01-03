@@ -28,17 +28,21 @@ ENV/
 # Jupyter
 .ipynb_checkpoints
 
-# Data and models
-data/
-data/raw/
-data/processed/
-best_model_bert_3class/
-*.joblib
-*.safetensors
+# Data and models (DVC tracked - ignore contents, track .dvc files)
+/data/raw/*
+/data/processed/*
+/best_model_bert_3class/*
+
+# Keep .gitkeep files
+!.gitkeep
+
+# But allow DVC pointer files (don't ignore these!)
+!*.dvc
 
 # Logs and local environment files
 *.log
 .env*
+!.env.example
 
 # OS files
 .DS_Store
@@ -50,3 +54,18 @@ Thumbs.db
 .cache/
 .coverage
 htmlcov/
+
+# Credentials (NEVER COMMIT)
+credentials/
+*.json
+!package.json
+!metrics.json
+
+# DVC internal cache
+.dvc/cache
+.dvc/tmp
+
+# MLflow
+mlruns/
+mlruns.db
+/best_model_bert_3class

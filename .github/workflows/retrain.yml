@@ -1,0 +1,92 @@
+name: Weekly Model Retrain
+
+on:
+  schedule:
+    # Every Sunday at midnight UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      force_retrain:
+        description: 'Force model retraining'
+        required: false
+        default: 'false'
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install dvc[gdrive]
+      
+      - name: Setup DVC
+        env:
+          GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
+        run: |
+          mkdir -p ~/.config/dvc
+          echo "$GDRIVE_CREDENTIALS_DATA" > ~/.config/dvc/gdrive-credentials.json
+          dvc remote modify gdrive gdrive_use_service_account true
+          dvc remote modify gdrive gdrive_service_account_json_file_path ~/.config/dvc/gdrive-credentials.json
+      
+      - name: Pull latest data
+        run: dvc pull
+      
+      - name: Check for new feedback data
+        id: check
+        run: |
+          if [ -f "data/raw/human_feedback.csv" ]; then
+            LINES=$(wc -l < data/raw/human_feedback.csv)
+            echo "feedback_count=$LINES" >> $GITHUB_OUTPUT
+          else
+            echo "feedback_count=0" >> $GITHUB_OUTPUT
+          fi
+          
+          if [ "${{ github.event.inputs.force_retrain }}" == "true" ]; then
+            echo "should_retrain=true" >> $GITHUB_OUTPUT
+          elif [ "$LINES" -gt 50 ]; then
+            echo "should_retrain=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_retrain=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Retrain model
+        if: steps.check.outputs.should_retrain == 'true'
+        run: |
+          python run_pipeline.py
+          dvc add best_model_bert_3class
+          dvc push
+      
+      - name: Commit changes
+        if: steps.check.outputs.should_retrain == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add best_model_bert_3class.dvc metrics.json
+          git commit -m "chore: retrain model (feedback: ${{ steps.check.outputs.feedback_count }} samples)" || exit 0
+          git push
+      
+      - name: Notify Slack
+        if: steps.check.outputs.should_retrain == 'true'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST $SLACK_WEBHOOK_URL \
+              -H 'Content-type: application/json' \
+              --data '{"text":"🤖 Model retrained successfully with new feedback data!"}'
+          fi
+      
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.config/dvc/gdrive-credentials.json

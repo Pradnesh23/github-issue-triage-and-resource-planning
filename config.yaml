@@ -89,12 +89,19 @@ model:
   num_epochs: 10
 
 notifications:
-  # Notification settings (optional)
-  slack_webhook_url: ""
-  email_smtp_server: ""
-  email_port: 587
-  email_username: ""
-  email_password: ""
+  # Slack settings (get webhook from api.slack.com/apps)
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    mention_on_complex: true  # @channel for complex issues
+  
+  # Email settings (optional)
+  email:
+    enabled: false
+    smtp_server: ""
+    port: 587
+    username: ""
+    password: ""
   
   # Team assignments based on complexity
   team_assignments:

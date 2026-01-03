@@ -1,0 +1,20 @@
+{
+    "accuracy": 0.529,
+    "f1_weighted": 0.54,
+    "f1_simple": 0.63,
+    "f1_moderate": 0.51,
+    "f1_complex": 0.41,
+    "precision_weighted": 0.58,
+    "training_samples": 29977,
+    "validation_samples": 5996,
+    "model_type": "distilbert-xgboost-stacking",
+    "feature_importance": {
+        "BERT_Simple": 0.2728,
+        "BERT_Complex": 0.2255,
+        "BERT_Moderate": 0.1922,
+        "user_issue_count": 0.0688,
+        "is_new_user": 0.0273,
+        "labels_count": 0.0,
+        "reactions": 0.0
+    }
+}

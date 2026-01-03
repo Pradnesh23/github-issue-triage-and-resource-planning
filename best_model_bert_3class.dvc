@@ -1,0 +1,6 @@
+outs:
+- md5: 69d3f09989c99d2016cf97276fdece20.dir
+  size: 271247176
+  nfiles: 9
+  hash: md5
+  path: best_model_bert_3class

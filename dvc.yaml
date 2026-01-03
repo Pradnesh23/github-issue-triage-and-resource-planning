@@ -1,0 +1,15 @@
+# DVC Pipeline Definition
+# Note: Training is done via notebooks/github-issue-predictor.ipynb on Kaggle
+# This pipeline tracks dependencies and metrics for versioning
+
+stages:
+  # Training is performed on Kaggle with GPU
+  # After training, download the model and run: dvc add best_model_bert_3class
+  train_model:
+    cmd: echo "Training performed on Kaggle. Run notebooks/github-issue-predictor.ipynb"
+    deps:
+      - notebooks/github-issue-predictor.ipynb
+      - data/raw/github_issues.csv
+    metrics:
+      - metrics.json:
+          cache: false
