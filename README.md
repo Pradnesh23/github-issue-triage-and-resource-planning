@@ -27,6 +27,24 @@ An intelligent system to **classify GitHub issues**, **prioritize work**, and **
 | **MLOps** | DVC (Google Drive), MLflow, GitHub Actions |
 | **Alerts** | Slack Webhooks |
 
+```mermaid
+graph TD
+    A[GitHub User] -->|Creates Issue| B(GitHub Repository)
+    B -->|Webhook| C[FastAPI Backend]
+    C -->|Classify| D{AI Model}
+    D -->|Complexity Score| E[Resource Allocator]
+    E -->|Notification| F[Slack Channel]
+    E -->|Data| G[Streamlit Dashboard]
+    
+    subgraph "AI System"
+    D -.->|Loads| H[DistilBERT + XGBoost]
+    end
+    
+    style C fill:#f9f,stroke:#333
+    style D fill:#bbf,stroke:#333
+    style F fill:#bfb,stroke:#333
+```
+
 ---
 
 ## 🚀 Quick Start
@@ -70,6 +88,20 @@ streamlit run app/streamlit_app.py
 2. **Track**: Log results to MLflow (`python scripts/log_kaggle_run.py`).
 3. **Version**: Push model to Google Drive (`dvc add ... && dvc push`).
 4. **Deploy**: Push to GitHub → CI/CD runs tests & builds.
+
+```mermaid
+flowchart LR
+    A[Kaggle GPU] -->|Train| B(Model Artifacts)
+    B -->|Log Metrics| C{MLflow}
+    B -->|Version Control| D{DVC + GDrive}
+    D -->|Push| E[GitHub Repo]
+    E -->|Trigger| F[GitHub Actions]
+    F -->|Deploy| G[Production]
+    
+    style A fill:#ff9,stroke:#333
+    style D fill:#9f9,stroke:#333
+    style F fill:#99f,stroke:#333
+```
 
 ---
 
