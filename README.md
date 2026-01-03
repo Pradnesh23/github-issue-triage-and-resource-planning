@@ -12,15 +12,16 @@ An intelligent system to **classify GitHub issues**, **prioritize work**, and **
 - **🧠 AI-Powered**: Fine-tuned DistilBERT + XGBoost ensemble (53% Acc on complex tasks).
 - **⚡ MLOps Integration**: DVC for data versioning, MLflow for tracking, GitHub Actions for CI/CD.
 - **🔔 Smart Notifications**: Color-coded Slack alerts with team routing (@channel for complex issues).
-- **📊 Interactive Dashboard**: Streamlit app for real-time insights and resource planning.
-- **� Continuous Learning**: Feedback loop to retrain models on new data.
+- **🤖 GenAI Advisor**: Google Gemini integration for automated resolution strategies.
+- **📊 Advanced Analytics**: Streamlit dashboard with trend analysis and resource planning.
+- **🔄 Continuous Learning**: Feedback loop to retrain models on new data.
 
 ---
 
 ## 🛠️ Architecture
 
 | Component | Tech Stack |
-|-----------|------------|
+| :--- | :--- |
 | **Model** | HuggingFace DistilBERT, XGBoost, Scikit-learn |
 | **Backend** | FastAPI, Uvicorn, PyGithub |
 | **Frontend** | Streamlit, Plotly |
@@ -33,12 +34,15 @@ graph TD
     A[GitHub User] -->|Creates Issue| B(GitHub Repository)
     B -->|Webhook| C[FastAPI Backend]
     C -->|Classify| D{AI Model}
+    C -->|Ask| I[Gemini GenAI]
     D -->|Complexity Score| E[Resource Allocator]
+    I -->|Resolution Plan| E
     E -->|Notification| F[Slack Channel]
-    E -->|Data| G[Streamlit Dashboard]
+    E -->|Data| G[Streamlit Analytics]
     
     subgraph "AI System"
     D -.->|Loads| H[DistilBERT + XGBoost]
+    I -.->|API| J[Google Gemini]
     end
     
     %% Styling
@@ -48,7 +52,7 @@ graph TD
     classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#e65100;
 
     class C,E,G primary;
-    class D,H secondary;
+    class D,H,I,J secondary;
     class F support;
     class A,B external;
 ```
@@ -72,6 +76,7 @@ Create a `.env` file:
 ```env
 GITHUB_TOKEN=ghp_...
 SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+GEMINI_API_KEY=AIza...
 ```
 
 ### 3. Run
@@ -122,7 +127,7 @@ flowchart LR
 ## 🔗 API Endpoints
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| :--- | :--- | :--- |
 | `POST` | `/predict` | Predict complexity for one issue |
 | `POST` | `/predict_batch` | Batch predictions |
 | `POST` | `/webhook/github` | Handle GitHub events |
@@ -134,7 +139,7 @@ flowchart LR
 
 ## 📂 Project Structure
 
-```
+```text
 ├── .github/workflows/   # CI/CD (Test, DVC, Retrain, Deploy)
 ├── api/                 # FastAPI Backend
 ├── app/                 # Streamlit Dashboard

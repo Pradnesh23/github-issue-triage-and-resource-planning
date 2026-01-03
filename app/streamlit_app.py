@@ -404,205 +404,161 @@ def main():
             st.warning("⚠️ API is not running. Start the API server to enable webhook functionality")
     
     with tab4:
-        st.header("Resource Planning Dashboard")
-        st.markdown("Visualize issue complexity distribution and resource allocation recommendations.")
+        st.header("Analytics & Insights")
+        st.markdown("Deep dive into GitHub issue trends and AI performance.")
 
-        # Auto-refresh controls
-        col_refresh, col_interval = st.columns([1, 1])
-        with col_refresh:
-            auto_refresh = st.checkbox("Auto-refresh", value=True, help="Automatically refresh the live feed")
-        with col_interval:
-            refresh_interval = st.slider("Refresh interval (seconds)", min_value=5, max_value=60, value=10)
-        # Try to enable auto-refresh if available
-        if auto_refresh:
-            try:
-                # Prefer built-in st_autorefresh if available
-                if hasattr(st, "autorefresh"):
-                    st.autorefresh(interval=refresh_interval * 1000, key="dashboard_refresh")
-                else:
-                    # Some environments provide st_autorefresh via component
-                    from streamlit_autorefresh import st_autorefresh  # type: ignore
-                    st_autorefresh(interval=refresh_interval * 1000, key="dashboard_refresh_component")
-            except Exception:
-                pass
-        
-        # Prefer real data from API if available
+        # Controls for refreshing
+        col0a, col0b = st.columns([3, 1])
+        with col0a:
+             metric_period = st.selectbox("Time Period", ["All Time", "Last 7 Days", "Last 30 Days"])
+        with col0b:
+             if st.button("🔄 Refresh Data"):
+                 st.experimental_rerun()
+
+        # Data Fetching
         dashboard_df = None
         if api_status:
-            records = get_recent_predictions(limit=300)
+            # Increase limit for analytics
+            records = get_recent_predictions(limit=500)
             if records:
-                try:
+                 try:
                     dashboard_df = pd.DataFrame(records)
-                except Exception:
-                    dashboard_df = None
+                 except Exception:
+                    pass
         
-        if dashboard_df is None:
-            # Sample data for demonstration
+        if dashboard_df is None or dashboard_df.empty:
+            st.info("No sufficient data for analytics. Using sample data.")
+             # Generate sample data with timestamps
+            dates = pd.date_range(end=datetime.now(), periods=50, freq='H')
             sample_data = pd.DataFrame({
-                "Repository": ["tensorflow/tensorflow", "pytorch/pytorch", "scikit-learn/scikit-learn"] * 10,
-                "Complexity": np.random.choice(["simple", "moderate", "complex"], 30, p=[0.4, 0.4, 0.2]),
-                "Issues": np.random.randint(1, 50, 30)
+                "timestamp": dates,
+                "repo": ["owner/repo"] * 50,
+                "complexity": np.random.choice(["simple", "moderate", "complex"], 50, p=[0.4, 0.4, 0.2]),
+                "confidence": np.random.uniform(0.5, 0.99, 50),
+                "labels": [["bug", "ui"], ["enhancement"], ["bug", "critical"]] * 16 + [["docs"], ["feature"]],
+                "title": [f"Issue {i}" for i in range(50)],
+                "comments": np.random.randint(0, 15, 50)
             })
             dashboard_df = sample_data
-        
-        # Repository filter
-        st.subheader("Repository Filter")
-        selected_repo = st.session_state.get("selected_repo")
-        if dashboard_df is not None and "repo" in dashboard_df.columns:
-            repos_list = sorted(list({r for r in dashboard_df["repo"].dropna().unique()}))
-            default_index = repos_list.index(selected_repo) if selected_repo in repos_list else 0 if repos_list else None
-            if repos_list:
-                repo_choice = st.selectbox("Filter by repository", options=repos_list, index=default_index if default_index is not None else 0)
-                dashboard_df = dashboard_df[dashboard_df["repo"] == repo_choice]
-
-        # Complexity distribution chart
-        st.subheader("Complexity Distribution Across Repositories")
-        if {"repo", "complexity"}.issubset(set(dashboard_df.columns)):
-            complexity_dist = dashboard_df.groupby(["repo", "complexity"]).size().reset_index(name="Count")
-            x_col = "repo"
-            color_col = "complexity"
         else:
-            complexity_dist = dashboard_df.groupby(["Repository", "Complexity"]).size().reset_index(name="Count")
-            x_col = "Repository"
-            color_col = "Complexity"
-        fig = px.bar(
-            complexity_dist,
-            x=x_col,
-            y="Count",
-            color=color_col,
-            barmode="group",
-            color_discrete_map={
-                "simple": "#4CAF50",
-                "moderate": "#FF9800",
-                "complex": "#F44336"
-            }
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Resource allocation recommendations
-        st.subheader("Resource Allocation Recommendations")
+            # Convert timestamp
+            if "timestamp" in dashboard_df.columns:
+                dashboard_df["timestamp"] = pd.to_datetime(dashboard_df["timestamp"], errors='coerce')
         
-        # Calculate distribution percentages
-        if "complexity" in dashboard_df.columns:
-            complexity_counts = dashboard_df["complexity"].value_counts()
+        # --- TOP METRICS ---
+        if dashboard_df is not None and not dashboard_df.empty:
             total_issues = len(dashboard_df)
-        else:
-            complexity_counts = dashboard_df["Complexity"].value_counts()
-            total_issues = len(dashboard_df)
-        simple_pct = (complexity_counts.get("simple", 0) / total_issues) * 100
-        moderate_pct = (complexity_counts.get("moderate", 0) / total_issues) * 100
-        complex_pct = (complexity_counts.get("complex", 0) / total_issues) * 100
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Simple Issues", f"{simple_pct:.1f}%", "40% target")
-            st.markdown("""
-            - Can be assigned to junior developers
-            - Estimated effort: 1-2 days
-            - Sprint planning candidates
-            """)
-        
-        with col2:
-            st.metric("Moderate Issues", f"{moderate_pct:.1f}%", "40% target")
-            st.markdown("""
-            - Require experienced developers
-            - Estimated effort: 2-5 days
-            - May need pair programming
-            """)
-        
-        with col3:
-            st.metric("Complex Issues", f"{complex_pct:.1f}%", "20% target")
-            st.markdown("""
-            - Need senior developers
-            - Estimated effort: 1-2 weeks
-            - Require team collaboration
-            """)
-        
-        # Team distribution suggestion
-        st.subheader("Team Distribution Suggestion")
-        
-        # Create a more detailed resource allocation plan
-        st.markdown("""
-        ### Recommended Team Structure:
-        - **Junior Developers (40% capacity)**: Handle simple issues
-        - **Mid-level Developers (40% capacity)**: Handle moderate issues
-        - **Senior Developers (20% capacity)**: Handle complex issues
-        
-        ### Workload Distribution:
-        """)
-        
-        # Create workload distribution chart
-        workload_data = pd.DataFrame({
-            "Developer Level": ["Junior", "Mid-level", "Senior"],
-            "Capacity (%)": [40, 40, 20],
-            "Issue Types": ["Simple", "Moderate", "Complex"]
-        })
-        
-        fig2 = px.pie(
-            workload_data,
-            values="Capacity (%)",
-            names="Developer Level",
-            color="Developer Level",
-            color_discrete_map={
-                "Junior": "#4CAF50",
-                "Mid-level": "#FF9800",
-                "Senior": "#F44336"
-            }
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+            complex_count = len(dashboard_df[dashboard_df["complexity"] == "complex"])
+            avg_conf = dashboard_df["confidence"].mean() if "confidence" in dashboard_df.columns else 0
+            high_conf_count = len(dashboard_df[dashboard_df["confidence"] > 0.9]) if "confidence" in dashboard_df.columns else 0
+            
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Total API Predictions", total_issues)
+            m2.metric("Complex Issues", complex_count, delta_color="inverse")
+            m3.metric("Avg AI Confidence", f"{avg_conf:.1%}")
+            m4.metric("High Confidence (>90%)", high_conf_count)
 
-        # Escalation paths
-        st.subheader("Escalation Paths")
-        st.markdown("""
-        1. **Simple Issues**: Junior → Mid-level (if blocked > 2 days)
-        2. **Moderate Issues**: Mid-level → Senior (if blocked > 5 days)
-        3. **Complex Issues**: Senior → Tech Lead (if blocked > 1 week)
+            st.markdown("---")
 
-        ### Sprint Planning Guidelines:
-        - Allocate 30% of sprint capacity for bug fixes
-        - Reserve 20% for unexpected complex issues
-        - Balance team workload based on complexity distribution
-        """)
-
-        # Live incoming issues feed with remedies
-        st.subheader("Live Incoming Issues")
-        if api_status:
-            feed_records = get_recent_predictions(limit=100)
-            if feed_records:
-                try:
-                    feed_df = pd.DataFrame(feed_records)
-                    # Ensure required columns exist
-                    for col in ["timestamp", "repo", "issue_number", "title", "complexity", "confidence", "labels", "comments"]:
-                        if col not in feed_df.columns:
-                            feed_df[col] = None
-                    # Remedy suggestions
-                    feed_df["remedy"] = feed_df.apply(
-                        lambda r: suggest_remedy(
-                            str(r.get("complexity") or ""),
-                            float(r.get("confidence") or 0.0),
-                            r.get("labels") if isinstance(r.get("labels"), list) else (
-                                [l.strip() for l in str(r.get("labels") or "").split(",") if l.strip()]
-                            ),
-                            int(r.get("comments") or 0)
-                        ), axis=1
+            # --- CHART ROW 1 ---
+            c1, c2 = st.columns(2)
+            
+            with c1:
+                st.subheader("Complexity Trend")
+                if "timestamp" in dashboard_df.columns:
+                    # Scatter plot of confidence over time, colored by complexity
+                    fig_trend = px.scatter(
+                        dashboard_df, 
+                        x="timestamp", 
+                        y="confidence", 
+                        color="complexity", 
+                        title="Incoming Issues Timeline",
+                        hover_data=["title"],
+                        color_discrete_map={"simple": "#4CAF50", "moderate": "#FF9800", "complex": "#F44336"}
                     )
-                    # Sort by latest
-                    if "timestamp" in feed_df.columns:
-                        try:
-                            feed_df["_ts"] = pd.to_datetime(feed_df["timestamp"], errors="coerce")
-                            feed_df = feed_df.sort_values("_ts", ascending=False)
-                        except Exception:
-                            pass
-                    # Display concise columns
-                    display_cols = ["timestamp", "repo", "issue_number", "title", "complexity", "confidence", "remedy"]
-                    st.dataframe(feed_df[display_cols], use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Unable to render live feed: {e}")
+                    st.plotly_chart(fig_trend, use_container_width=True)
+                else:
+                    st.warning("No timestamp data available for trend analysis.")
+
+            with c2:
+                st.subheader("Complexity Distribution")
+                if "complexity" in dashboard_df.columns:
+                    fig_dist = px.pie(
+                        dashboard_df, 
+                        names="complexity", 
+                        color="complexity", 
+                        hole=0.4,
+                        title="Overall Issue Distribution",
+                        color_discrete_map={"simple": "#4CAF50", "moderate": "#FF9800", "complex": "#F44336"}
+                    )
+                    st.plotly_chart(fig_dist, use_container_width=True)
+
+            # --- CHART ROW 2 ---
+            c3, c4 = st.columns(2)
+            
+            with c3:
+                st.subheader("Top Labels")
+                # Flatten labels
+                all_labels = []
+                if "labels" in dashboard_df.columns:
+                    for item in dashboard_df["labels"]:
+                        if isinstance(item, list):
+                            for l in item:
+                                if isinstance(l, dict):
+                                    all_labels.append(l.get("name", "unknown"))
+                                else:
+                                    all_labels.append(str(l))
+                        elif isinstance(item, str):
+                            all_labels.extend([x.strip() for x in item.split(",") if x.strip()])
+                
+                if all_labels:
+                    lbl_counts = pd.Series(all_labels).value_counts().head(10).reset_index()
+                    lbl_counts.columns = ["Label", "Count"]
+                    fig_lbl = px.bar(
+                        lbl_counts, 
+                        x="Count", 
+                        y="Label", 
+                        orientation='h', 
+                        title="Most Frequent Labels",
+                        color="Count",
+                        color_continuous_scale="Viridis"
+                    )
+                    st.plotly_chart(fig_lbl, use_container_width=True)
+                else:
+                    st.info("No label data available.")
+
+            with c4:
+                st.subheader("High Priority Issues")
+                # Filter for complex issues
+                if "complexity" in dashboard_df.columns:
+                    complex_df = dashboard_df[dashboard_df["complexity"] == "complex"]
+                    if not complex_df.empty:
+                        # Show table
+                        display_cols = ["timestamp", "title", "confidence"]
+                        # Filter to only existing columns
+                        cols_to_show = [c for c in display_cols if c in complex_df.columns]
+                        st.dataframe(
+                            complex_df[cols_to_show].sort_values("timestamp", ascending=False).head(10),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                    else:
+                        st.success("No complex issues found! 🎉")
+
+            # --- RESOURCE PLANNING ---
+            st.markdown("---")
+            st.subheader("Resource Planning Advice")
+            
+            # Simple heuristic advice
+            rec_text = ""
+            if complex_count > total_issues * 0.3:
+                rec_text = "⚠️ **High volume of complex issues.** Consider allocating more Senior Engineers to triage."
+            elif total_issues > 0 and (complex_count / total_issues) < 0.1:
+                rec_text = "✅ **Healthy mix.** Junior/Mid-level devs should be able to handle the current load."
             else:
-                st.info("No recent predictions yet. New issues will appear here in real time.")
-        else:
-            st.info("API is not running. Start the API to enable the live feed.")
+                 rec_text = "ℹ️ **Standard load.** Maintain current team distribution."
+            
+            st.markdown(rec_text)
 
 if __name__ == "__main__":
     main()
