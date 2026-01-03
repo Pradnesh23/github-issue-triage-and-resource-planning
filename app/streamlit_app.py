@@ -9,11 +9,14 @@ import numpy as np
 import requests
 import yaml
 import json
+import os
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 from typing import Dict, List, Any
 from github import Github
+
+from src.models.solution_advisor import SolutionAdvisor
 
 # Load configuration
 with open("config.yaml", "r") as f:
@@ -272,6 +275,9 @@ def main():
                     result = predict_complexity(issue_data)
                     if result:
                         display_prediction_result(result, title)
+                        
+                        # Store for AI Advisor
+                        st.session_state['current_issue'] = issue_data
             else:
                 st.info("API is not available. Showing example prediction:")
                 # Example result for demonstration
@@ -285,9 +291,30 @@ def main():
                     }
                 }
                 display_prediction_result(example_result, title)
+                st.session_state['current_issue'] = issue_data
         
         elif submitted:
             st.warning("Please enter at least an issue title.")
+
+        # AI Solution Section
+        if 'current_issue' in st.session_state:
+            st.markdown("---")
+            st.subheader("🤖 AI Solution Advisor")
+            
+            if st.button("Generate Technical Resolution Plan"):
+                issue = st.session_state['current_issue']
+                advisor = SolutionAdvisor()
+                
+                if not advisor.model:
+                    st.warning("⚠️ GEMINI_API_KEY not set. Cannot generate solution.")
+                else:
+                    with st.spinner("consulting Gemini 1.5 Flash..."):
+                        solution = advisor.generate_solution(
+                            issue['title'], 
+                            issue['body'], 
+                            issue['labels']
+                        )
+                        st.markdown(solution)
     
     with tab2:
         st.header("Batch Prediction for Multiple Issues")
