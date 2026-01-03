@@ -48,8 +48,25 @@ class ContinuousLearner:
                     predicted_complexity or "",
                     "",  # human_label left blank
                 ])
+            
+            # Log to MLflow
+            self.log_feedback_to_mlflow(issue, predicted_complexity)
+            
         except Exception:
             # Best-effort logging; do not raise to avoid breaking webhook
+            pass
+
+    def log_feedback_to_mlflow(self, issue: Dict[str, Any], predicted_complexity: str | None) -> None:
+        """Log feedback event to MLflow."""
+        try:
+            import mlflow
+            mlflow.set_experiment("github_issue_complexity_feedback")
+            with mlflow.start_run(run_name=f"feedback_{datetime.now().strftime('%Y%m%d_%H%M%S')}"):
+                mlflow.log_param("repo", issue.get("repo"))
+                mlflow.log_param("issue_number", issue.get("number"))
+                mlflow.log_param("predicted_complexity", predicted_complexity)
+                mlflow.log_metric("comments_count", int(issue.get("comments") or 0))
+        except Exception:
             pass
 
     def get_learning_status(self) -> Dict[str, Any]:

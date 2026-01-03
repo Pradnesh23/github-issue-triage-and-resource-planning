@@ -9,11 +9,13 @@ import json
 from datetime import datetime
 from typing import Dict, Any, List
 import csv
+import re
 
 import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoConfig, AutoModelForSequenceClassification
-
+import xgboost as xgb
+import joblib
 
 PREDICTIONS_FILE = os.path.join("data", "raw", "predictions.jsonl")
 BEST_MODEL_DIR = "best_model_bert_3class"
@@ -30,10 +32,13 @@ class GitHubIssuePredictor:
         os.makedirs(os.path.dirname(PREDICTIONS_FILE), exist_ok=True)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # Try loading fine-tuned classifier from local directory
+        # Initialize model attributes
         self.tokenizer = None
         self.config = None
         self.model = None
+        self.xgb_model = None
+        self.scaler = None
+
         try:
             if os.path.exists(BEST_MODEL_DIR):
                 self.tokenizer = AutoTokenizer.from_pretrained(BEST_MODEL_DIR, local_files_only=True)
@@ -44,11 +49,29 @@ class GitHubIssuePredictor:
                     torch_dtype=torch.float32,
                 ).to(self.device)
                 self.model.eval()
-        except Exception:
-            # If loading fails, keep heuristic-only mode
+                print(f"Loaded DistilBERT model from {BEST_MODEL_DIR}")
+
+                # Try loading XGBoost model and scaler
+                # Expecting them in the same directory as the BERT model
+                xgb_path = os.path.join(BEST_MODEL_DIR, "xgboost_stacking_model.joblib")
+                scaler_path = os.path.join(BEST_MODEL_DIR, "numeric_scaler.joblib")
+                
+                if os.path.exists(xgb_path) and os.path.exists(scaler_path):
+                    self.xgb_model = joblib.load(xgb_path)
+                    self.scaler = joblib.load(scaler_path)
+                    print(f"Loaded XGBoost model from {xgb_path}")
+                else:
+                    print(f"XGBoost model or scaler not found in {BEST_MODEL_DIR}. Using BERT-only mode.")
+            else:
+                print(f"Model directory {BEST_MODEL_DIR} not found. Using heuristic mode.")
+
+        except Exception as e:
+            print(f"Error loading models: {e}. Falling back to heuristic-only mode.")
             self.tokenizer = None
             self.config = None
             self.model = None
+            self.xgb_model = None
+            self.scaler = None
 
     def predict_complexity(self, issue: Dict[str, Any]) -> Dict[str, Any]:
         """Predict complexity for a single issue.
@@ -74,6 +97,7 @@ class GitHubIssuePredictor:
         # If model is available, use it
         if self.model and self.tokenizer:
             try:
+                # 1. Get BERT Probabilities
                 inputs = self.tokenizer(
                     text if text else title,
                     truncation=True,
@@ -86,16 +110,62 @@ class GitHubIssuePredictor:
                     logits = outputs.logits.cpu().numpy()[0]
                 # Softmax
                 exps = np.exp(logits - np.max(logits))
-                probs_arr = exps / np.sum(exps)
+                bert_probs = exps / np.sum(exps) # [p_simple, p_moderate, p_complex]
+
+                # 2. Check for Stacking Model (XGBoost)
+                if self.xgb_model and self.scaler:
+                    # Extract numeric features matching the training logic
+                    
+                    def has_pattern(txt, pattern):
+                        return 1 if re.search(pattern, txt, re.IGNORECASE) else 0
+                    
+                    len_title = len(title)
+                    len_body = len(body)
+                    word_count = len(body.split())
+                    has_code = has_pattern(body, r'```|`[^`]+`')
+                    has_image = has_pattern(body, r'!\[.*\]|<img')
+                    has_url = has_pattern(body, r'http[s]?://')
+                    
+                    # User features (simplified as we might not have history in real-time)
+                    user_issue_count = 0 
+                    is_new_user = 1
+                    
+                    labels_count = len(labels)
+                    reactions = 0 
+                    
+                    # Feature order must match training:
+                    # ['len_title', 'len_body', 'word_count', 'has_code', 'has_image', 'has_url', 
+                    #  'user_issue_count', 'is_new_user', 'labels_count', 'reactions']
+                    numeric_features = np.array([[
+                        len_title, len_body, word_count, has_code, has_image, has_url,
+                        user_issue_count, is_new_user, labels_count, reactions
+                    ]])
+                    
+                    # Scale numeric features
+                    numeric_scaled = self.scaler.transform(numeric_features)
+                    
+                    # Combine BERT probs + Numeric
+                    # BERT probs shape (1, 3), Numeric shape (1, 10)
+                    bert_probs_reshaped = bert_probs.reshape(1, -1)
+                    X_combined = np.hstack([bert_probs_reshaped, numeric_scaled])
+                    
+                    # XGBoost Prediction
+                    xgb_probs = self.xgb_model.predict_proba(X_combined)[0]
+                    probs_arr = xgb_probs
+                else:
+                    # Fallback to just BERT probs if XGBoost is missing
+                    probs_arr = bert_probs
 
                 # Map labels from config
                 id2label = getattr(self.config, "id2label", {0: "SIMPLE", 1: "MODERATE", 2: "COMPLEX"})
                 labels_map = {int(k): v for k, v in id2label.items()} if isinstance(id2label, dict) else {0: "SIMPLE", 1: "MODERATE", 2: "COMPLEX"}
                 class_names = [labels_map.get(i, "SIMPLE") for i in range(len(probs_arr))]
+                
                 # Normalize to lowercase keys: simple/moderate/complex
                 probs: Dict[str, float] = {}
                 for name, p in zip(class_names, probs_arr):
                     probs[name.lower()] = round(float(p), 4)
+                
                 # Ensure all keys exist
                 for k in ["simple", "moderate", "complex"]:
                     probs.setdefault(k, 0.0)
@@ -108,7 +178,8 @@ class GitHubIssuePredictor:
                     "confidence": float(confidence),
                     "probabilities": probs,
                 }
-            except Exception:
+            except Exception as e:
+                print(f"Model prediction failed: {e}")
                 # Fall through to heuristics
                 pass
 

@@ -1,348 +1,106 @@
-# GitHub Issue Triage and Resource Allocation
+# 🚀 GitHub Issue Triage & Resource Allocation
 
-An intelligent system for GitHub issue triage and resource planning that classifies incoming GitHub issues by complexity (Simple, Moderate, Complex) to help development teams prioritize work and allocate resources effectively.
+![Tests](https://github.com/Pradnesh23/github-issue-triage-and-resource-planning/actions/workflows/test.yml/badge.svg)
+![Build](https://github.com/Pradnesh23/github-issue-triage-and-resource-planning/actions/workflows/deploy.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.10-blue.svg)
+![DVC](https://img.shields.io/badge/DVC-Gdrive-purple.svg)
 
-## Features
+An intelligent system to **classify GitHub issues**, **prioritize work**, and **automate triage** using Deep Learning (DistilBERT + XGBoost) and MLOps best practices.
 
-- **ML-Powered Classification**: Fine-tuned DistilBERT model with XGBoost stacking ensemble for accurate issue complexity prediction
-- **Real-time GitHub Webhook Integration**: Automatically receive and process new GitHub issues in real-time
-- **Interactive Streamlit Dashboard**: Visualize predictions, statistics, and resource allocation recommendations
-- **REST API Endpoints**: FastAPI-based endpoints for programmatic access to predictions and dataset management
-- **Continuous Learning**: Track human feedback and retrain models with new labeled data
-- **Heuristic Fallback**: Robust heuristic-based predictions when ML models are unavailable
-- **Persistent Prediction History**: Store and track all predictions for audit and analysis
+## ✨ Key Features
 
-## Technology Stack
+- **🧠 AI-Powered**: Fine-tuned DistilBERT + XGBoost ensemble (53% Acc on complex tasks).
+- **⚡ MLOps Integration**: DVC for data versioning, MLflow for tracking, GitHub Actions for CI/CD.
+- **🔔 Smart Notifications**: Color-coded Slack alerts with team routing (@channel for complex issues).
+- **📊 Interactive Dashboard**: Streamlit app for real-time insights and resource planning.
+- **� Continuous Learning**: Feedback loop to retrain models on new data.
 
-- **ML & Deep Learning**: PyTorch, transformers (DistilBERT), scikit-learn, XGBoost
-- **NLP Processing**: NLTK, spaCy
-- **Feature Engineering**: category-encoders, imbalanced-learn
-- **API Framework**: FastAPI, Uvicorn, Pydantic
-- **Web Interface**: Streamlit
-- **Data Processing**: Pandas, NumPy
-- **Visualization**: Plotly, Seaborn, Matplotlib, SHAP
-- **GitHub Integration**: PyGithub
-- **MLOps & Experimentation**: MLflow, DVC, Optuna
-- **Notifications**: Slack Webhooks
-- **CI/CD**: GitHub Actions
-- **Utilities**: PyYAML, python-dotenv, Joblib, aiohttp, requests
+---
 
-## MLOps Features
+## 🛠️ Architecture
 
-### DVC (Data Version Control)
+| Component | Tech Stack |
+|-----------|------------|
+| **Model** | HuggingFace DistilBERT, XGBoost, Scikit-learn |
+| **Backend** | FastAPI, Uvicorn, PyGithub |
+| **Frontend** | Streamlit, Plotly |
+| **MLOps** | DVC (Google Drive), MLflow, GitHub Actions |
+| **Alerts** | Slack Webhooks |
 
-Track large data files and models with Google Drive storage:
+---
 
-```bash
-# Pull data/models from remote
-dvc pull
+## 🚀 Quick Start
 
-# After training, push updates
-dvc add best_model_bert_3class
-dvc push
-
-# Show metrics
-dvc metrics show
-```
-
-### MLflow Experiment Tracking
+### 1. Installation
 
 ```bash
-# Start MLflow UI
-mlflow ui --port 5000
-
-# Log Kaggle training results
-python scripts/log_kaggle_run.py
+git clone https://github.com/Pradnesh23/github-issue-triage-and-resource-planning.git
+pip install -r requirements.txt
+dvc pull  # Download model & data from Google Drive
 ```
 
-### Slack Notifications
+### 2. Configuration
 
-Receive real-time notifications when issues are triaged:
+Create a `.env` file:
 
-- 🟢 Simple issues → Junior developers
-- 🟡 Moderate issues → Mid-level developers  
-- 🔴 Complex issues → Senior developers (@channel mention)
+```env
+GITHUB_TOKEN=ghp_...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+```
 
-### GitHub Actions
+### 3. Run
 
-| Workflow | Trigger | Purpose |
-|----------|---------|--------|
-| `test.yml` | PR/Push | Lint & test |
-| `dvc-pipeline.yml` | Push | Show DVC status |
-| `retrain.yml` | Weekly | Training reminder |
-| `deploy.yml` | Push | Build verification |
-
-## Setup
-
-### Prerequisites
-
-- Python 3.8+
-- Git
-- GitHub Personal Access Token (for API access)
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/Pradnesh23/github-issue-triage-and-resource-planning.git
-   cd github-issue-triage-and-resource-planning
-   ```
-
-2. Create a virtual environment:
-
-   ```bash
-   python -m venv venv
-   source venv/Scripts/activate  # On Windows
-   # or
-   source venv/bin/activate      # On macOS/Linux
-   ```
-
-3. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Download pre-trained model (optional but recommended):
-   - The project includes a pre-trained DistilBERT model in `best_model_bert_3class/`
-   - If not present, the system will use heuristic-based predictions
-
-5. Configure the application:
-
-   ```bash
-   cp config.yaml config.yaml.local
-   # Edit config.yaml.local with your settings
-   export GITHUB_TOKEN="your_github_token_here"
-   export WEBHOOK_SECRET="your_webhook_secret_here"
-   ```
-
-## Usage
-
-### 1. Start the FastAPI Server
+**API:**
 
 ```bash
-uvicorn api.main:app --reload --port 8000
+uvicorn api.main:app --reload
 ```
 
-The API will be available at `http://localhost:8000` with interactive docs at `/docs`.
-
-### 2. Run the Streamlit Dashboard
-
-In a new terminal:
+**Dashboard:**
 
 ```bash
 streamlit run app/streamlit_app.py
 ```
 
-The dashboard opens at `http://localhost:8501`.
+---
 
-### 3. Make Predictions
+## 🤖 MLOps Workflow
 
-**Via REST API:**
+1. **Train**: Run `notebooks/github-issue-predictor.ipynb` on Kaggle (GPU).
+2. **Track**: Log results to MLflow (`python scripts/log_kaggle_run.py`).
+3. **Version**: Push model to Google Drive (`dvc add ... && dvc push`).
+4. **Deploy**: Push to GitHub → CI/CD runs tests & builds.
 
-```bash
-curl -X POST "http://localhost:8000/predict" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Fix authentication bug",
-    "body": "Users cannot login with OAuth tokens",
-    "labels": ["bug"],
-    "comments": 5
-  }'
-```
+---
 
-**Batch Predictions:**
-
-```bash
-curl -X POST "http://localhost:8000/predict_batch" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "issues": [...]
-  }'
-```
-
-### 4. Dataset Operations
-
-```bash
-# Consolidate raw and human feedback data
-curl -X POST "http://localhost:8000/dataset/consolidate"
-
-# Get dataset statistics
-curl -X GET "http://localhost:8000/dataset/stats"
-```
-
-### 5. GitHub Webhook Integration
-
-To set up real-time GitHub integration:
-
-1. Deploy the application to a publicly accessible server
-2. Go to your GitHub repository settings → **Webhooks**
-3. Click **Add webhook**
-4. Configure:
-   - **Payload URL**: `https://your-domain.com/webhook/github`
-   - **Content type**: `application/json`
-   - **Events**: Select "Issues" and "Issue comments"
-   - **Active**: ✓ Checked
-5. Click **Add webhook**
-
-The API will automatically:
-
-- Receive issue events
-- Predict complexity
-- Store results in `data/raw/predictions.jsonl`
-- Display in the Streamlit dashboard
-
-### 6. Continuous Learning & Model Retraining
-
-**Data Consolidation:**
-
-- Merge raw training data with human feedback
-- Deduplicate entries (prefer human labels)
-- Save to `data/processed/consolidated_issues.csv`
-
-**Retraining Pipeline:**
-
-```bash
-python run_pipeline.py
-```
-
-**Jupyter Notebook:**
-
-- See `notebooks/github-issue-predictor.ipynb` for EDA and training examples
-- Prepare data for DistilBERT or XGBoost feature engineering
-
-## Project Structure
-
-```
-.
-├── .dvc/                         # DVC configuration
-├── .github/workflows/            # GitHub Actions CI/CD
-│   ├── test.yml                  # Lint & test workflow
-│   ├── dvc-pipeline.yml          # DVC status workflow
-│   ├── retrain.yml               # Weekly retrain reminder
-│   └── deploy.yml                # Build verification
-├── api/                          # FastAPI backend
-│   ├── main.py                   # Main API application & endpoints
-│   ├── schemas.py                # Pydantic request/response models
-│   └── webhook.py                # GitHub webhook handler
-├── app/                          # Streamlit web interface
-│   └── streamlit_app.py          # Interactive dashboard
-├── best_model_bert_3class/       # Pre-trained DistilBERT model (DVC tracked)
-├── notebooks/                    # Jupyter notebooks
-│   └── github-issue-predictor.ipynb  # Kaggle training notebook
-├── scripts/                      # Utility scripts
-│   └── log_kaggle_run.py         # Log Kaggle results to MLflow
-├── src/                          # Core modules
-│   ├── models/                   # Prediction & learning modules
-│   │   ├── predict.py            # Issue complexity predictor
-│   │   ├── mlflow_utils.py       # MLflow tracking utilities
-│   │   └── continuous_learning.py
-│   └── notifications/            # Slack notification system
-│       └── notifier.py           # Rich Slack messages
-├── data/                         # Data directory (DVC tracked)
-│   ├── raw/                      # Raw GitHub issues & feedback
-│   └── processed/                # Processed & consolidated data
-├── config.yaml                   # Configuration file
-├── dvc.yaml                      # DVC pipeline definition
-├── metrics.json                  # Model metrics (DVC tracked)
-├── requirements.txt              # Python dependencies
-├── .env.example                  # Environment variables template
-└── README.md                     # This file
-```
-
-## Configuration
-
-Edit `config.yaml` to customize:
-
-```yaml
-github:
-  token: ${GITHUB_TOKEN}           # Set via environment variable
-  webhook_secret: ${WEBHOOK_SECRET} # Set via environment variable
-  repositories:
-    - "owner/repo1"
-    - "owner/repo2"
-
-api:
-  port: 8000
-  host: "127.0.0.1"
-
-model:
-  # Uses pre-trained model in best_model_bert_3class/ if available
-  # Falls back to heuristic predictions otherwise
-```
-
-**Important**: Never commit actual tokens. Use environment variables or `.env` files.
-
-## Model Information
-
-The system uses a **DistilBERT-based ensemble**:
-
-- **Primary Model**: Fine-tuned DistilBERT (3-class: Simple, Moderate, Complex)
-- **Secondary Model**: XGBoost stacking ensemble for feature-based predictions
-- **Numeric Scaling**: Joblib-persisted scaler for numerical features
-- **Fallback**: Heuristic-based predictions if models unavailable
-
-**Performance**:
-
-- Trained on 1000+ GitHub issues across popular repositories
-- Considers: title, body, labels, comment count
-- Handles edge cases with robust error handling
-
-## API Endpoints
+## 🔗 API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/predict` | Predict complexity for a single issue |
-| POST | `/predict_batch` | Batch predict multiple issues |
-| POST | `/dataset/consolidate` | Consolidate raw data with human feedback |
-| GET | `/dataset/stats` | Get dataset statistics |
-| POST | `/webhook/github` | GitHub webhook receiver |
-| GET | `/docs` | Interactive API documentation |
+| `POST` | `/predict` | Predict complexity for one issue |
+| `POST` | `/predict_batch` | Batch predictions |
+| `POST` | `/webhook/github` | Handle GitHub events |
+| `GET`  | `/dataset/stats` | View training data stats |
 
-## Testing
+> Full docs at `http://localhost:8000/docs`
 
-```bash
-# Test the model
-python test_model.py
+---
 
-# Test webhook locally
-python start_test_server.py  # Terminal 1
-python test_webhook.py       # Terminal 2
+## 📂 Project Structure
+
+```
+├── .github/workflows/   # CI/CD (Test, DVC, Retrain, Deploy)
+├── api/                 # FastAPI Backend
+├── app/                 # Streamlit Dashboard
+├── best_model_bert_3class/ # Production Model (DVC)
+├── data/                # Dataset (DVC coverage)
+├── notebooks/           # Training (Kaggle)
+├── src/                 # Source Code
+│   ├── models/          # Predictor & MLflow utils
+│   └── notifications/   # Slack Notifier
+└── dvc.yaml             # Pipeline Config
 ```
 
-## Troubleshooting
+---
 
-**Issue**: Model not loading
-
-- Ensure `best_model_bert_3class/` directory exists
-- System will automatically fall back to heuristics if model unavailable
-
-**Issue**: Cannot connect to API
-
-- Check if `http://localhost:8000` is accessible
-- Verify API server is running: `uvicorn api.main:app --reload`
-
-**Issue**: Webhook not receiving events
-
-- Ensure application is deployed publicly
-- Check GitHub repository webhook settings
-- Verify `WEBHOOK_SECRET` matches GitHub configuration
-
-**Issue**: Low prediction accuracy
-
-- Ensure model is fine-tuned on relevant issue data
-- Check data quality in `data/processed/consolidated_issues.csv`
-- Consider retraining with recent labeled data
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a pull request
-
-## License
-
-This project is licensed under the MIT License.
+*Licensed under MIT.*

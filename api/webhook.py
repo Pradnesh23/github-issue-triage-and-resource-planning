@@ -11,10 +11,10 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import yaml
 import os
-
 from fastapi import APIRouter, Request, HTTPException, Header
 from pydantic import BaseModel
 from github import Github
+from dotenv import load_dotenv
 
 from src.models.predict import GitHubIssuePredictor
 from src.models.continuous_learning import ContinuousLearner
@@ -25,8 +25,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load configuration
-with open("config.yaml", "r") as f:
-    config = yaml.safe_load(f)
+load_dotenv()
+try:
+    with open("config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+except FileNotFoundError:
+    config = {}
 
 # Initialize FastAPI router
 router = APIRouter(prefix="/webhook")
@@ -36,21 +40,44 @@ predictor = GitHubIssuePredictor()
 learner = ContinuousLearner()
 notifier = TeamNotifier()
 
-# Get GitHub webhook secret and token from config
-WEBHOOK_SECRET = config.get("github", {}).get("webhook_secret", "")
-GITHUB_TOKEN = config.get("github", {}).get("token", "")
+# Global configuration storage
+runtime_config = {
+    "WEBHOOK_SECRET": os.getenv("WEBHOOK_SECRET") or config.get("github", {}).get("webhook_secret", ""),
+    "GITHUB_TOKEN": os.getenv("GITHUB_TOKEN") or config.get("github", {}).get("token", "")
+}
 
 # Initialize GitHub client
-github_client = Github(GITHUB_TOKEN) if GITHUB_TOKEN else None
+github_client = Github(runtime_config["GITHUB_TOKEN"]) if runtime_config["GITHUB_TOKEN"] else None
+
+class ConfigUpdate(BaseModel):
+    webhook_secret: Optional[str] = None
+    github_token: Optional[str] = None
+
+@router.post("/config")
+async def update_config(config_update: ConfigUpdate):
+    """Update runtime configuration."""
+    if config_update.webhook_secret is not None:
+        runtime_config["WEBHOOK_SECRET"] = config_update.webhook_secret
+        logger.info("Updated Webhook Secret")
+    if config_update.github_token is not None:
+        runtime_config["GITHUB_TOKEN"] = config_update.github_token
+        # Re-initialize GitHub client
+        global github_client
+        github_client = Github(runtime_config["GITHUB_TOKEN"]) if runtime_config["GITHUB_TOKEN"] else None
+        logger.info("Updated GitHub Token")
+    return {"status": "updated"}
 
 def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
     """Verify GitHub webhook signature."""
-    if not secret:
+    # Use runtime secret if available, otherwise passed secret
+    effective_secret = runtime_config["WEBHOOK_SECRET"] or secret
+    
+    if not effective_secret:
         logger.warning("No webhook secret configured. Skipping signature verification.")
         return True
     
     expected = hmac.new(
-        secret.encode('utf-8'),
+        effective_secret.encode('utf-8'),
         payload,
         hashlib.sha256
     ).hexdigest()
@@ -60,43 +87,6 @@ def verify_signature(payload: bytes, signature: str, secret: str) -> bool:
         return hmac.compare_digest(expected, signature_sha256)
     except (IndexError, ValueError):
         return False
-
-@router.post("/github")
-async def github_webhook(
-    request: Request,
-    x_github_event: str = Header(None),
-    x_hub_signature_256: str = Header(None)
-):
-    """Handle GitHub webhook events."""
-    try:
-        # Get request body
-        body = await request.body()
-        
-        # Verify signature if secret is configured
-        if WEBHOOK_SECRET:
-            if not x_hub_signature_256:
-                raise HTTPException(status_code=400, detail="Missing signature")
-            
-            if not verify_signature(body, x_hub_signature_256, WEBHOOK_SECRET):
-                raise HTTPException(status_code=401, detail="Invalid signature")
-        
-        # Parse JSON payload
-        payload = await request.json()
-        
-        # Handle different event types
-        if x_github_event == "issues":
-            return await handle_issue_event(payload)
-        elif x_github_event == "issue_comment":
-            return await handle_issue_comment_event(payload)
-        else:
-            logger.info(f"Unhandled GitHub event type: {x_github_event}")
-            return {"status": "ignored", "event_type": x_github_event}
-            
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
-    except Exception as e:
-        logger.error(f"Error processing webhook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 async def handle_issue_event(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Handle GitHub issues event."""
@@ -153,7 +143,7 @@ async def handle_issue_event(payload: Dict[str, Any]) -> Dict[str, Any]:
         
         # Automatically label the GitHub issue based on complexity prediction
         complexity_label_added = False
-        if github_client and GITHUB_TOKEN:
+        if github_client and runtime_config["GITHUB_TOKEN"]:
             try:
                 # Get the repository and issue objects
                 repo = github_client.get_repo(repository.get("full_name"))
@@ -168,13 +158,6 @@ async def handle_issue_event(payload: Dict[str, Any]) -> Dict[str, Any]:
                 logger.info(f"Added label '{complexity_label}' to issue #{issue_data['number']} in {issue_data['repo']}")
             except Exception as e:
                 logger.error(f"Error adding label to GitHub issue: {e}")
-        
-        # In a real implementation, you might:
-        # 1. Store the prediction in a database
-        # 2. Send notifications to relevant team members
-        # 3. Update project management tools
-        # 4. Trigger resource allocation processes
-        # 5. Add labels to the GitHub issue
         
         return {
             "status": "processed",
@@ -248,7 +231,7 @@ async def handle_issue_comment_event(payload: Dict[str, Any]) -> Dict[str, Any]:
             
             # Automatically update the GitHub issue label based on complexity prediction
             complexity_label_added = False
-            if github_client and GITHUB_TOKEN:
+            if github_client and runtime_config["GITHUB_TOKEN"]:
                 try:
                     # Get the repository and issue objects
                     repo = github_client.get_repo(repository.get("full_name"))
@@ -300,6 +283,44 @@ async def handle_issue_comment_event(payload: Dict[str, Any]) -> Dict[str, Any]:
         "action": action,
         "reason": "Comment event not relevant for complexity prediction"
     }
+
+@router.post("/github")
+async def github_webhook(
+    request: Request,
+    x_github_event: str = Header(None),
+    x_hub_signature_256: str = Header(None)
+):
+    """Handle GitHub webhook events."""
+    try:
+        # Get request body
+        body = await request.body()
+        
+        # Verify signature if secret is configured
+        secret = runtime_config["WEBHOOK_SECRET"]
+        if secret:
+            if not x_hub_signature_256:
+                raise HTTPException(status_code=400, detail="Missing signature")
+            
+            if not verify_signature(body, x_hub_signature_256, secret):
+                raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        # Parse JSON payload
+        payload = await request.json()
+        
+        # Handle different event types
+        if x_github_event == "issues":
+            return await handle_issue_event(payload)
+        elif x_github_event == "issue_comment":
+            return await handle_issue_comment_event(payload)
+        else:
+            logger.info(f"Unhandled GitHub event type: {x_github_event}")
+            return {"status": "ignored", "event_type": x_github_event}
+            
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    except Exception as e:
+        logger.error(f"Error processing webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status")
 async def webhook_status():
