@@ -29,6 +29,7 @@ An intelligent system to **classify GitHub issues**, **prioritize work**, and **
 
 ```mermaid
 graph TD
+    %% Nodes
     A[GitHub User] -->|Creates Issue| B(GitHub Repository)
     B -->|Webhook| C[FastAPI Backend]
     C -->|Classify| D{AI Model}
@@ -40,9 +41,16 @@ graph TD
     D -.->|Loads| H[DistilBERT + XGBoost]
     end
     
-    style C fill:#f9f,stroke:#333
-    style D fill:#bbf,stroke:#333
-    style F fill:#bfb,stroke:#333
+    %% Styling
+    classDef primary fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#01579b;
+    classDef secondary fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#4a148c;
+    classDef support fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#1b5e20;
+    classDef external fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#e65100;
+
+    class C,E,G primary;
+    class D,H secondary;
+    class F support;
+    class A,B external;
 ```
 
 ---
@@ -91,6 +99,7 @@ streamlit run app/streamlit_app.py
 
 ```mermaid
 flowchart LR
+    %% Nodes
     A[Kaggle GPU] -->|Train| B(Model Artifacts)
     B -->|Log Metrics| C{MLflow}
     B -->|Version Control| D{DVC + GDrive}
@@ -98,9 +107,14 @@ flowchart LR
     E -->|Trigger| F[GitHub Actions]
     F -->|Deploy| G[Production]
     
-    style A fill:#ff9,stroke:#333
-    style D fill:#9f9,stroke:#333
-    style F fill:#99f,stroke:#333
+    %% Styling
+    classDef train fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#333;
+    classDef track fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px,color:#333;
+    classDef ci fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#333;
+    
+    class A,B,D train;
+    class C track;
+    class E,F,G ci;
 ```
 
 ---
