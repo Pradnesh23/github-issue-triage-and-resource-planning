@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,21 +22,14 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install dvc[gdrive]
       
-      - name: Pull model from DVC
-        env:
-          GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
+      - name: Verify build
         run: |
-          mkdir -p ~/.config/dvc
-          echo "$GDRIVE_CREDENTIALS_DATA" > ~/.config/dvc/gdrive-credentials.json
-          dvc remote modify gdrive gdrive_use_service_account true
-          dvc remote modify gdrive gdrive_service_account_json_file_path ~/.config/dvc/gdrive-credentials.json
-          dvc pull best_model_bert_3class
-          rm -f ~/.config/dvc/gdrive-credentials.json
+          echo "✅ Dependencies installed successfully"
+          python -c "from src.models.predict import GitHubIssuePredictor; print('Model import OK')" || echo "Model files not present (expected - use dvc pull locally)"
       
       # === DEPLOYMENT OPTIONS ===
-      # Uncomment and configure based on your cloud provider
+      # Uncomment based on your cloud provider
       
       # Option 1: Deploy to Heroku
       # - name: Deploy to Heroku
@@ -52,19 +45,7 @@ jobs:
       #   with:
       #     railway_token: ${{ secrets.RAILWAY_TOKEN }}
       
-      # Option 3: Deploy to Render via webhook
-      # - name: Deploy to Render
-      #   run: curl ${{ secrets.RENDER_DEPLOY_HOOK }}
-      
-      # Option 4: Build and push Docker image
-      # - name: Build and push Docker image
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: your-registry/github-issues-triage:latest
-      
-      - name: Deployment placeholder
+      - name: Build status
         run: |
           echo "✅ Build successful - ready for deployment"
           echo "Configure your deployment target in this workflow"

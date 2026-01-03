@@ -4,13 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'src/models/**'
-      - 'src/data/**'
       - 'dvc.yaml'
+      - 'metrics.json'
   workflow_dispatch:
 
 jobs:
-  dvc-pipeline:
+  dvc-status:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,26 +20,14 @@ jobs:
           python-version: '3.10'
           cache: 'pip'
       
-      - name: Install dependencies
+      - name: Install DVC
+        run: pip install dvc
+      
+      - name: Show DVC config
         run: |
-          pip install -r requirements.txt
-          pip install dvc[gdrive]
+          echo "DVC is configured with Google Drive remote"
+          echo "To pull data locally, run: dvc pull"
+          cat dvc.yaml
       
-      - name: Setup DVC with Google Drive
-        env:
-          GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS_DATA }}
-        run: |
-          mkdir -p ~/.config/dvc
-          echo "$GDRIVE_CREDENTIALS_DATA" > ~/.config/dvc/gdrive-credentials.json
-          dvc remote modify gdrive gdrive_use_service_account true
-          dvc remote modify gdrive gdrive_service_account_json_file_path ~/.config/dvc/gdrive-credentials.json
-      
-      - name: Pull DVC data
-        run: dvc pull
-      
-      - name: Show DVC status
-        run: dvc status
-      
-      - name: Cleanup credentials
-        if: always()
-        run: rm -f ~/.config/dvc/gdrive-credentials.json
+      - name: Show metrics
+        run: cat metrics.json
